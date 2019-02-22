@@ -1,6 +1,6 @@
 <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
 <div id="app">
-    <div v-for="(message, index) in messages">
+    <div v-for="(message, index) in messages" v-bind:id="message.uid">
         <h5 v-bind:style="getMessageStyle(message)">
             <span v-if="index == focused">|</span><span v-else>&nbsp;</span>
             {{ getSenderName(message) }}: {{ message.subject.replace(/\n/g, '') }}
@@ -11,11 +11,12 @@
 </div>
 
 <!-- TODO: archive message -->
-<!-- TODO: select folder -->
 <!-- TODO: re-connect -->
 <!-- TODO: multiuser -->
 <!-- TODO: incapsulate html styles -->
 <!-- TODO: sanitize images and links of spam messages -->
+<!-- TODO: custom tags maybe -->
+<!-- TODO: scroll message into view -->
 
 <script>
 const app = new Vue({
@@ -47,6 +48,7 @@ const app = new Vue({
         }
         window.focus()
         window.addEventListener('keydown', function(event) {
+            console.log(event.keyCode)
             let map = keyMap
             let code = event.keyCode
             if (multiPress) {
@@ -121,6 +123,26 @@ const app = new Vue({
             } else if (this.focused != 0) {
                 this.focused -= 1
             }
+        },
+        scroll: function() {
+            let message = this.messages[this.focused]
+            let elem = document.getElementById(message.uid)
+            let elemBottom = elem.offsetTop + elem.offsetHeight
+            let windowBottom = document.scrollingElement.scrollTop + window.innerHeight
+            if (elemBottom > windowBottom) {
+                //window.scrollTo(0, elem.offsetTop - 100)
+            }
+            if (elem.offsetTop < document.scrollingElement.scrollTop) {
+                window.scrollTo(0, elem.offsetTop - 100)
+            }
+            if (elem.offsetTop > windowBottom) {
+                window.scrollTo(0, elem.offsetTop - 100)
+            }
+            // if
+                // bottom = d.offsetTop + d.offsetHeight
+            // lower than
+                // document.scrollingElement.scrollTop + window.innerHeight
+            // window.scrollTo(0, d.offsetTop)
         },
         openTag: function() {
             console.log(0, this.tag)
