@@ -4,7 +4,7 @@ import imaplib
 import shlex
 
 from sanic import Sanic
-from sanic.response import json
+from sanic.response import json, file
 
 from imbox import Imbox, parser
 
@@ -18,11 +18,10 @@ FLAGS = {
 }
 
 app = Sanic()
-app.static('/app', 'index.html')
 client = None
 
 
-@app.route("/<tag>/")
+@app.route("/api/<tag>/")
 async def get_list(request, tag):
     global client
     if not client:
@@ -49,7 +48,7 @@ async def get_list(request, tag):
             messages.append(message)
         return json(reversed(messages))
 
-@app.route("/<tag>/<uid>/")
+@app.route("/api/<tag>/<uid>/")
 async def get_message(request, tag, uid):
     response = client.connection.uid("fetch", uid, "(BODY.PEEK[])")
     labels, message = response[1][0]
@@ -58,7 +57,7 @@ async def get_message(request, tag, uid):
     message.uid = labels.split()[2]
     return json(message)
 
-@app.delete("/<tag>/<uid>/flags/<flag>/")
+@app.delete("/api/<tag>/<uid>/flags/<flag>/")
 async def delete_flag(request, tag, uid, flag):
     flag = FLAGS[flag]
     flags = client.connection.uid("store", uid, "-FLAGS", flag)[1][0]
@@ -67,7 +66,7 @@ async def delete_flag(request, tag, uid, flag):
     flags = imaplib.ParseFlags(flags)
     return json(flags)
 
-@app.post("/<tag>/<uid>/flags/<flag>/")
+@app.post("/api/<tag>/<uid>/flags/<flag>/")
 async def add_flag(request, tag, uid, flag):
     flag = FLAGS[flag]
     flags = client.connection.uid("store", uid, "+FLAGS", flag)[1][0]
@@ -76,13 +75,18 @@ async def add_flag(request, tag, uid, flag):
     flags = imaplib.ParseFlags(flags)
     return json(flags)
 
-@app.post("/login")
+@app.post("/api/login")
 async def post_handler(request):
     global client
     password = request.json["password"]
     client = Imbox("imap.gmail.com", username="andrey@gethappie.me", password=password)
     client.selected = None
     return json({"success": "logged in"})
+
+@app.route("")
+@app.route("/<url>")
+async def handle_request(request, url=None):
+    return await file('index.html')
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)

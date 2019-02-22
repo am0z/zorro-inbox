@@ -11,13 +11,10 @@
 </div>
 
 <!-- TODO: archive message -->
-<!-- TODO: switch html/text -->
 <!-- TODO: select folder -->
 <!-- TODO: tag from url path -->
 <!-- TODO: re-connect -->
 <!-- TODO: multiuser -->
-<!-- TODO: toggle seen flag -->
-<!-- TODO: seen message font-weight: normal; -->
 <!-- TODO: incapsulate html styles -->
 <!-- TODO: sanitize images and links of spam messages -->
 
@@ -27,9 +24,9 @@ const app = new Vue({
     data: {
         focused: null,
         open: false,
-        tag: 'inbox',
+        tag: null,
         html: true,
-        api: 'http://0.0.0.0:8000',
+        api: 'http://0.0.0.0:8000/api',
         messages: []
     },
     created: function() {
@@ -48,11 +45,6 @@ const app = new Vue({
                 72: app.toggleHtml
             }
         }
-        fetch(`${this.api}/${this.tag}/`)
-          .then((response) => response.json())
-          .then(function(messages) {
-              app.messages = messages
-          })
         window.focus()
         window.addEventListener('keydown', function(event) {
             console.log(event.keyCode)
@@ -72,8 +64,22 @@ const app = new Vue({
                 multiPress = null
             }
         })
+        this.tag = window.location.pathname.split('/')[1] || 'inbox'
     },
     watch: {
+        tag: function(_new, old) {
+            console.log(100, _new, old, this.tag)
+            if (old == null) {
+                window.history.replaceState(null, null, this.tag)
+            } else {
+                window.history.pushState(null, null, this.tag)
+            }
+            fetch(`${this.api}/${this.tag}/`)
+              .then((response) => response.json())
+              .then(function(messages) {
+                  app.messages = messages
+              })
+        },
         open: function() {
             if (this.open & this.messages[this.focused].body.html[0] == null) {
                 this.fetchMessage(this.focused)
