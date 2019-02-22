@@ -1,0 +1,142 @@
+<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+<div id="app">
+    <div v-for="(message, index) in messages">
+        <h5 v-bind:style="getMessageStyle(message)">
+            <span v-if="index == focused">|</span><span v-else>&nbsp;</span>
+            {{ getSenderName(message) }}: {{ message.subject.replace(/\n/g, '') }}
+        </h5>
+        <div v-if="index == focused & open & html" v-html="message.body.html[0]"></div>
+        <pre v-else-if="index == focused & open">{{ message.body.plain[0] }}</pre>
+    </div>
+</div>
+
+<!-- TODO: archive message -->
+<!-- TODO: switch html/text -->
+<!-- TODO: select folder -->
+<!-- TODO: tag from url path -->
+<!-- TODO: re-connect -->
+<!-- TODO: multiuser -->
+<!-- TODO: toggle seen flag -->
+<!-- TODO: seen message font-weight: normal; -->
+<!-- TODO: incapsulate html styles -->
+<!-- TODO: sanitize images and links of spam messages -->
+
+<script>
+const app = new Vue({
+    el: '#app',
+    data: {
+        focused: null,
+        open: false,
+        tag: 'inbox',
+        html: true,
+        api: 'http://0.0.0.0:8000',
+        messages: []
+    },
+    created: function() {
+        let app = this
+        let multiPress = null
+        let keyMap = {
+            74: app.focusNext,
+            75: app.focusPrevious,
+            13: app.toggleOpen,
+            27: app.close,
+            73: {  // `i` keypress
+                73: () => console.log('puk'),
+                83: app.toggleSeen  // `s` keypress
+            },
+            90: {
+                72: app.toggleHtml
+            }
+        }
+        fetch(`${this.api}/${this.tag}/`)
+          .then((response) => response.json())
+          .then(function(messages) {
+              app.messages = messages
+          })
+        window.focus()
+        window.addEventListener('keydown', function(event) {
+            console.log(event.keyCode)
+            let map = keyMap
+            let code = event.keyCode
+            if (multiPress) {
+                map = map[multiPress]
+            }
+            if (code in map) {
+                if (typeof map[code] === 'object') {
+                    multiPress = code
+                } else {
+                    multiPress = null
+                    map[code]()
+                }
+            } else {
+                multiPress = null
+            }
+        })
+    },
+    watch: {
+        open: function() {
+            if (this.open & this.messages[this.focused].body.html[0] == null) {
+                this.fetchMessage(this.focused)
+            }
+        },
+        focused: function() {
+            if (this.open & this.messages[this.focused].body.html[0] == null) {
+                this.fetchMessage(this.focused)
+            }
+        }
+    },
+    methods: {
+        getSenderName: function(message) {
+            let sender = message.sent_from[0]
+            return sender.name ? sender.name : sender.email
+        },
+        getMessageStyle: function(message) {
+            return {
+                fontWeight: message.flags.includes('\\Seen') ? 'normal' : 'bold'
+            }
+        },
+        toggleOpen: function() {
+            this.open = !this.open
+        },
+        toggleHtml: function() {
+            this.html = !this.html
+        },
+        close: function() {
+            this.open = false
+        },
+        focusNext: function() {
+            if (this.focused == null) {
+                this.focused = 0
+            } else if (this.focused < this.messages.length - 1) {
+                this.focused += 1
+            }
+        },
+        focusPrevious: function() {
+            if (this.focused == null) {
+                this.focused = 0
+            } else if (this.focused != 0) {
+                this.focused -= 1
+            }
+        },
+        fetchMessage: function(index) {
+            let message = this.messages[index]
+            message.body.html[0] = 'Loading'
+            fetch(`${this.api}/${this.tag}/${message.uid}`)
+              .then((response) => response.json())
+              .then(function(data) {
+                  message.body.html = data.body.html
+                  message.body.plain = data.body.plain
+              })
+        },
+        toggleSeen: function() {
+            let message = this.messages[app.focused]
+            let method = message.flags.includes('\\Seen') ? 'DELETE' : 'POST'
+            fetch(`${this.api}/${this.tag}/${message.uid}/flags/seen/`, { method: method })
+              .then((response) => response.json())
+              .then(function(flags) {
+                  message.flags = flags
+              })
+        }
+    }
+})
+</script>
