@@ -12,7 +12,6 @@
 
 <!-- TODO: archive message -->
 <!-- TODO: select folder -->
-<!-- TODO: tag from url path -->
 <!-- TODO: re-connect -->
 <!-- TODO: multiuser -->
 <!-- TODO: incapsulate html styles -->
@@ -37,6 +36,7 @@ const app = new Vue({
             75: app.focusPrevious,
             13: app.toggleOpen,
             27: app.close,
+            79: app.openTag,
             73: {  // `i` keypress
                 73: () => console.log('puk'),
                 83: app.toggleSeen  // `s` keypress
@@ -47,7 +47,6 @@ const app = new Vue({
         }
         window.focus()
         window.addEventListener('keydown', function(event) {
-            console.log(event.keyCode)
             let map = keyMap
             let code = event.keyCode
             if (multiPress) {
@@ -68,7 +67,6 @@ const app = new Vue({
     },
     watch: {
         tag: function(_new, old) {
-            console.log(100, _new, old, this.tag)
             if (old == null) {
                 window.history.replaceState(null, null, this.tag)
             } else {
@@ -123,6 +121,11 @@ const app = new Vue({
             } else if (this.focused != 0) {
                 this.focused -= 1
             }
+        },
+        openTag: function() {
+            console.log(0, this.tag)
+            this.tag = prompt()
+            console.log(1, this.tag)
         },
         fetchMessage: function(index) {
             let message = this.messages[index]
