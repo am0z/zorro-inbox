@@ -31,8 +31,8 @@ const app = new Vue({
     },
     created: function() {
         let app = this
-        let multiPress = null
-        let keyMap = {
+        let shift = false
+        const keyMap = {
             74: app.focusNext,
             75: app.focusPrevious,
             13: app.toggleOpen,
@@ -42,27 +42,41 @@ const app = new Vue({
                 73: () => console.log('puk'),
                 83: app.toggleSeen  // `s` keypress
             },
-            90: {
-                72: app.toggleHtml
+            71: function(keypress) {
+                if (keypress.shiftKey) {  // `G` go to bottom
+                    app.focused = app.messages.length - 1
+                } else {  // else map for next keypress
+                    return {
+                        71: function () {
+                            app.focused = 0
+                        }
+                    }
+                }
+            },
+            // [ 219
+            // ] 221
+            // y 89 app.messages.splice(index, 1)
+            90: {  // `z`
+                72: app.toggleHtml  // `h`
             }
         }
+        let map = keyMap
         window.focus()
         window.addEventListener('keydown', function(event) {
-            console.log(event.keyCode)
-            let map = keyMap
+            console.log(event.keyCode, event.shiftKey)
             let code = event.keyCode
-            if (multiPress) {
-                map = map[multiPress]
-            }
             if (code in map) {
                 if (typeof map[code] === 'object') {
-                    multiPress = code
+                    map = map[code]
                 } else {
-                    multiPress = null
-                    map[code]()
+                    // execute and reset map
+                    map = map[code](event)  // could return a new map
+                    if (map == null) {
+                        map = keyMap
+                    }
                 }
             } else {
-                multiPress = null
+                map = keyMap  // reset
             }
         })
         this.tag = window.location.pathname.split('/')[1] || 'inbox'
@@ -74,6 +88,7 @@ const app = new Vue({
             } else {
                 window.history.pushState(null, null, this.tag)
             }
+            document.title = this.tag
             fetch(`${this.api}/${this.tag}/`)
               .then((response) => response.json())
               .then(function(messages) {
@@ -116,6 +131,7 @@ const app = new Vue({
             } else if (this.focused < this.messages.length - 1) {
                 this.focused += 1
             }
+            Vue.nextTick(this.scroll)
         },
         focusPrevious: function() {
             if (this.focused == null) {
@@ -123,6 +139,7 @@ const app = new Vue({
             } else if (this.focused != 0) {
                 this.focused -= 1
             }
+            Vue.nextTick(this.scroll)
         },
         scroll: function() {
             let message = this.messages[this.focused]
@@ -130,24 +147,14 @@ const app = new Vue({
             let elemBottom = elem.offsetTop + elem.offsetHeight
             let windowBottom = document.scrollingElement.scrollTop + window.innerHeight
             if (elemBottom > windowBottom) {
-                //window.scrollTo(0, elem.offsetTop - 100)
+                window.scrollTo(0, elem.offsetTop - 60)
             }
             if (elem.offsetTop < document.scrollingElement.scrollTop) {
-                window.scrollTo(0, elem.offsetTop - 100)
+                window.scrollTo(0, elem.offsetTop - 60)
             }
-            if (elem.offsetTop > windowBottom) {
-                window.scrollTo(0, elem.offsetTop - 100)
-            }
-            // if
-                // bottom = d.offsetTop + d.offsetHeight
-            // lower than
-                // document.scrollingElement.scrollTop + window.innerHeight
-            // window.scrollTo(0, d.offsetTop)
         },
         openTag: function() {
-            console.log(0, this.tag)
             this.tag = prompt()
-            console.log(1, this.tag)
         },
         fetchMessage: function(index) {
             let message = this.messages[index]
