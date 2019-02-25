@@ -9,7 +9,6 @@ from sanic.response import json, file
 from imbox import Imbox, parser
 
 # TODO: flask?
-# TODO: tag from url
 # TODO: multiuser
 
 
@@ -19,6 +18,12 @@ FLAGS = {
 
 app = Sanic()
 client = None
+
+
+def quote_folder_name(folder_name: str):
+    folder_name = folder_name.replace("\\", "\\\\")
+    folder_name = folder_name.replace('"', '\\"')
+    return f'"{folder_name}"'
 
 
 @app.route("/api/<tag>/")
@@ -36,10 +41,10 @@ async def get_list(request, tag):
                 real_tag = shlex.split(item.decode())[-1]
                 if real_tag.lower().count(tag):
                     break
-            client.connection.select(real_tag)
+            client.connection.select(quote_folder_name(real_tag))
         client.selected = tag
         uids = client.connection.uid('search', None, '(ALL)')[1][0].split()
-        response = client.connection.uid("fetch", b",".join(uids), "(BODY.PEEK[HEADER.FIELDS (FROM TO DATE SUBJECT)] FLAGS)")
+        response = client.connection.uid("fetch", b",".join(uids[-100:]), "(BODY.PEEK[HEADER.FIELDS (FROM TO DATE SUBJECT)] FLAGS)")
         for labels, message in response[1][::2]:
             message = parser.parse_email(message)
             message.uid = labels.split()[2]
