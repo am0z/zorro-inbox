@@ -1,6 +1,6 @@
 <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
 <div id="app">
-    <div v-for="(message, index) in messages" v-bind:id="message.uid">
+    <div v-for="(message, index) in messages" v-bind:id="message.uid" :key="message.uid">
         <h5 v-bind:style="getMessageStyle(message)">
             <span v-if="index == focused">|</span><span v-else>&nbsp;</span>
             {{ getSenderName(message) }}: {{ message.subject.replace(/\n/g, '') }}
@@ -10,13 +10,11 @@
     </div>
 </div>
 
-<!-- TODO: archive message -->
 <!-- TODO: re-connect -->
 <!-- TODO: multiuser -->
 <!-- TODO: incapsulate html styles -->
 <!-- TODO: sanitize images and links of spam messages -->
 <!-- TODO: custom tags maybe -->
-<!-- TODO: scroll message into view -->
 
 <script>
 const app = new Vue({
@@ -53,9 +51,9 @@ const app = new Vue({
                     }
                 }
             },
-            // [ 219
-            // ] 221
-            // y 89 app.messages.splice(index, 1)
+            89: app.archiveAndClose,  // `y`
+            219: app.archiveAndNext,  // '['
+            221: app.archiveAndPrev,  // ']'
             90: {  // `z`
                 72: app.toggleHtml  // `h`
             }
@@ -83,13 +81,14 @@ const app = new Vue({
     },
     watch: {
         tag: function(_new, old) {
+            let app = this
             if (old == null) {
                 window.history.replaceState(null, null, this.tag)
             } else {
                 window.history.pushState(null, null, this.tag)
             }
             document.title = this.tag
-            fetch(`${this.api}/${this.tag}/`)
+            fetch(`${this.api}/${this.tag}`)
               .then((response) => response.json())
               .then(function(messages) {
                   app.messages = messages
@@ -118,6 +117,7 @@ const app = new Vue({
         },
         toggleOpen: function() {
             this.open = !this.open
+            this.$nextTick(this.scroll)
         },
         toggleHtml: function() {
             this.html = !this.html
@@ -131,7 +131,7 @@ const app = new Vue({
             } else if (this.focused < this.messages.length - 1) {
                 this.focused += 1
             }
-            Vue.nextTick(this.scroll)
+            this.$nextTick(this.scroll)
         },
         focusPrevious: function() {
             if (this.focused == null) {
@@ -139,7 +139,7 @@ const app = new Vue({
             } else if (this.focused != 0) {
                 this.focused -= 1
             }
-            Vue.nextTick(this.scroll)
+            this.$nextTick(this.scroll)
         },
         scroll: function() {
             let message = this.messages[this.focused]
@@ -152,6 +152,37 @@ const app = new Vue({
             if (elem.offsetTop < document.scrollingElement.scrollTop) {
                 window.scrollTo(0, elem.offsetTop - 60)
             }
+        },
+        archive: function(uid) {
+            return fetch(`${this.api}/${this.tag}/${uid}/flags/delete`, { method: 'POST' })
+        },
+        archiveAndClose: function() {
+            let app = this
+            let message = this.messages[this.focused]
+            this.archive(message.uid)
+                .then(function() {
+                    app.close()
+                    app.messages.splice(app.focused, 1)
+                })
+        },
+        archiveAndNext: function() {
+            let app = this
+            let message = this.messages[this.focused]
+            this.archive(message.uid)
+                .then(function() {
+                    app.toggleOpen()
+                    app.$nextTick(app.toggleOpen)
+                    app.messages.splice(app.focused, 1)
+                })
+        },
+        archiveAndPrev: function() {
+            let app = this
+            let message = this.messages[this.focused]
+            this.archive(message.uid)
+                .then(function() {
+                    app.messages.splice(app.focused, 1)
+                    app.focused = app.focused - 1
+                })
         },
         openTag: function() {
             this.tag = prompt()
@@ -167,9 +198,9 @@ const app = new Vue({
               })
         },
         toggleSeen: function() {
-            let message = this.messages[app.focused]
+            let message = this.messages[this.focused]
             let method = message.flags.includes('\\Seen') ? 'DELETE' : 'POST'
-            fetch(`${this.api}/${this.tag}/${message.uid}/flags/seen/`, { method: method })
+            fetch(`${this.api}/${this.tag}/${message.uid}/flags/seen`, { method: method })
               .then((response) => response.json())
               .then(function(flags) {
                   message.flags = flags

@@ -14,6 +14,7 @@ from imbox import Imbox, parser
 
 FLAGS = {
     "seen": "\\Seen",
+    "delete": "\\Deleted",
 }
 
 app = Sanic()
@@ -53,7 +54,7 @@ async def get_list(request, tag):
             messages.append(message)
         return json(reversed(messages))
 
-@app.route("/api/<tag>/<uid>/")
+@app.get("/api/<tag>/<uid>/")
 async def get_message(request, tag, uid):
     response = client.connection.uid("fetch", uid, "(BODY.PEEK[])")
     labels, message = response[1][0]
