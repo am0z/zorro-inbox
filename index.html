@@ -11,7 +11,6 @@
 </div>
 
 <!-- TODO: re-connect -->
-<!-- TODO: multiuser -->
 <!-- TODO: incapsulate html styles -->
 <!-- TODO: sanitize images and links of spam messages -->
 <!-- TODO: custom tags maybe -->
@@ -23,8 +22,9 @@ const app = new Vue({
         focused: null,
         open: false,
         tag: null,
+        username: null,
         html: true,
-        api: 'http://0.0.0.0:8000/api',
+        api: 'http://zorro:8000/api',
         messages: []
     },
     created: function() {
@@ -77,7 +77,9 @@ const app = new Vue({
                 map = keyMap  // reset
             }
         })
-        this.tag = window.location.pathname.split('/')[1] || 'inbox'
+        let path = window.location.pathname.split('/')
+        this.username = path[1]
+        this.tag = path[2] || 'inbox'
     },
     watch: {
         tag: function(_new, old) {
@@ -88,11 +90,7 @@ const app = new Vue({
                 window.history.pushState(null, null, this.tag)
             }
             document.title = this.tag
-            fetch(`${this.api}/${this.tag}`)
-              .then((response) => response.json())
-              .then(function(messages) {
-                  app.messages = messages
-              })
+            this.getMessages()
         },
         open: function() {
             if (this.open & this.messages[this.focused].body.html[0] == null) {
@@ -154,7 +152,7 @@ const app = new Vue({
             }
         },
         archive: function(uid) {
-            return fetch(`${this.api}/${this.tag}/${uid}/flags/delete`, { method: 'POST' })
+            return fetch(`${this.api}/${this.username}/${this.tag}/${uid}/flags/delete`, { method: 'POST' })
         },
         archiveAndClose: function() {
             let app = this
@@ -189,8 +187,7 @@ const app = new Vue({
         },
         fetchMessage: function(index) {
             let message = this.messages[index]
-            message.body.html[0] = 'Loading'
-            fetch(`${this.api}/${this.tag}/${message.uid}`)
+            fetch(`${this.api}/${this.username}/${this.tag}/${message.uid}`)
               .then((response) => response.json())
               .then(function(data) {
                   message.body.html = data.body.html
@@ -200,10 +197,28 @@ const app = new Vue({
         toggleSeen: function() {
             let message = this.messages[this.focused]
             let method = message.flags.includes('\\Seen') ? 'DELETE' : 'POST'
-            fetch(`${this.api}/${this.tag}/${message.uid}/flags/seen`, { method: method })
+            fetch(`${this.api}/${this.username}/${this.tag}/${message.uid}/flags/seen`, { method: method })
               .then((response) => response.json())
               .then(function(flags) {
                   message.flags = flags
+              })
+        },
+        getMessages: function() {
+            let app = this
+            fetch(`${this.api}/${this.username}/${this.tag}`)
+              .then(function(response) {
+                  response.json()
+                      .then(function(messages) {
+                          if (response.status == 401) {
+                              let password = prompt()
+                              fetch(`${app.api}/${app.username}`, {
+                                  method: 'POST',
+                                  body: JSON.stringify({password: password})
+                              }).then(app.getMessages)
+                          } else {
+                              app.messages = messages
+                          }
+                      })
               })
         }
     }
