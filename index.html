@@ -1,21 +1,31 @@
 <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+<style>
+    iframe {
+        border: 0;
+        width: 100%;
+    }
+</style>
 <div id="app">
     <div v-for="(message, index) in messages" v-bind:id="message.uid" :key="message.uid">
         <h5 v-bind:style="getMessageStyle(message)">
             <span v-if="index == focused">|</span><span v-else>&nbsp;</span>
             {{ getSenderName(message) }}: {{ message.subject.replace(/\n/g, '') }}
         </h5>
-        <div v-if="index == focused & open & html" v-html="message.body.html[0]"></div>
-        <pre v-else-if="index == focused & open">{{ message.body.plain[0] }}</pre>
+        <iframe key="html-frame" v-if="index == focused & open & html" v-bind:src="getMessageHtmlUrl(message.uid)" onload="resizeFrame(this)"></iframe>
+        <iframe key="text-frame" v-else-if="index == focused & open" v-bind:src="getMessageTextUrl(message.uid)" onload="this.style.height=this.contentDocument.body.scrollHeight +'px';"></iframe>
     </div>
 </div>
 
-<!-- TODO: re-connect -->
-<!-- TODO: incapsulate html styles -->
 <!-- TODO: sanitize images and links of spam messages -->
 <!-- TODO: custom tags maybe -->
+<!-- TODO: error indication, maybe? -->
 
 <script>
+
+window.resizeFrame = function(frame) {
+    frame.style.height = frame.contentDocument.body.scrollHeight +'px';
+}
+
 const app = new Vue({
     el: '#app',
     data: {
@@ -51,6 +61,7 @@ const app = new Vue({
                     }
                 }
             },
+            82: app.login, // `r`
             89: app.archiveAndClose,  // `y`
             219: app.archiveAndNext,  // '['
             221: app.archiveAndPrev,  // ']'
@@ -90,14 +101,16 @@ const app = new Vue({
                 window.history.pushState(null, null, this.tag)
             }
             document.title = this.tag
-            this.getMessages()
+            this.fetchMessages()
         },
         open: function() {
+            return  // noop
             if (this.open & this.messages[this.focused].body.html[0] == null) {
                 this.fetchMessage(this.focused)
             }
         },
         focused: function() {
+            return  // noop
             if (this.open & this.messages[this.focused].body.html[0] == null) {
                 this.fetchMessage(this.focused)
             }
@@ -112,6 +125,12 @@ const app = new Vue({
             return {
                 fontWeight: message.flags.includes('\\Seen') ? 'normal' : 'bold'
             }
+        },
+        getMessageHtmlUrl: function(uid) {
+            return `${this.api}/${this.username}/${this.tag}/${uid}.html`
+        },
+        getMessageTextUrl: function(uid) {
+            return `${this.api}/${this.username}/${this.tag}/${uid}.txt`
         },
         toggleOpen: function() {
             this.open = !this.open
@@ -203,18 +222,21 @@ const app = new Vue({
                   message.flags = flags
               })
         },
-        getMessages: function() {
+        login: function() {
+            let password = prompt()
+            return fetch(`${app.api}/${app.username}`, {
+                method: 'POST',
+                body: JSON.stringify({password: password})
+            })
+        },
+        fetchMessages: function() {
             let app = this
             fetch(`${this.api}/${this.username}/${this.tag}`)
               .then(function(response) {
                   response.json()
                       .then(function(messages) {
                           if (response.status == 401) {
-                              let password = prompt()
-                              fetch(`${app.api}/${app.username}`, {
-                                  method: 'POST',
-                                  body: JSON.stringify({password: password})
-                              }).then(app.getMessages)
+                              app.login().then(app.fetchMessages)
                           } else {
                               app.messages = messages
                           }
